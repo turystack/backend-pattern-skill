@@ -1,0 +1,20 @@
+{
+	"name": "@turystack/backend-pattern",
+	"description": "Backend engineering constitution skill — how each layer and cross-cutting concern is written in a turystack backend. Installed into .claude/skills and/or .codex/skills via the turystack CLI.",
+	"private": false,
+	"version": "1.0.0",
+	"sideEffects": false,
+	"publishConfig": {
+		"access": "public"
+	},
+	"engines": {
+		"node": ">=20"
+	},
+	"files": [
+		"*.md"
+	],
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/turystack/backend-pattern.git"
+	}
+}
