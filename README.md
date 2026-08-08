@@ -1,12 +1,19 @@
-# tury-stack-backend-pattern
+# @turystack/backend-pattern
 
-Backend application constitution: decisions and boundaries, without duplicating
-the documentation of Turystack libraries.
+Backend engineering constitution skill — how each layer and cross-cutting concern is written in a turystack backend. Installed into .claude/skills and/or .codex/skills via the turystack CLI.
 
-- [Overview](00-overview.md)
+## Installation
+
+```bash
+pnpm add -D @turystack/backend-pattern
+```
+
+## Contents
+
+- [Backend Engineering Standards](00-overview.md)
 - [Project Structure & Domain Boundaries](01-project-structure.md)
 - [Schemas](02-schemas.md)
-- [Controllers & Transport Contracts](03-controllers.md)
+- [Controllers](03-controllers.md)
 - [Use Cases](04-use-cases.md)
 - [Repositories & Persistence Policy](05-repositories.md)
 - [Entities](06-entities.md)
@@ -17,3 +24,8 @@ the documentation of Turystack libraries.
 - [Security](11-security.md)
 - [Testing](12-testing.md)
 - [Telemetry Policy](13-telemetry.md)
+- [Skill manifest](SKILL.md)
+
+## Documentation
+
+**https://tury.dev/libs/backend-pattern**
