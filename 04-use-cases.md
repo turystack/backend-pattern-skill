@@ -115,7 +115,7 @@ export class CancelOrderUseCase {
     this.publisher.publish({
       data: updated,
       destination: 'TOPIC',
-      name: 'OrderCancelled',
+      name: 'order.cancelled',
     })
 
     return updated
