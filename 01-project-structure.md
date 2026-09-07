@@ -213,12 +213,12 @@ domains/iam/src/
 │   ├── user/
 │   │   ├── user.schema.ts        the row it owns, and the closed sets that row uses
 │   │   ├── user.types.ts         what those sets are called in TypeScript
-│   │   ├── user.entity.ts        the invariants
+│   │   ├── user.entity.ts        the invariants, and the helpers that serve them
 │   │   ├── user.repository.ts    rows in and out
 │   │   ├── user.mock.ts          the builder a test writes with
-│   │   └── user.password.ts      a pure helper with a single owner
+│   │   └── index.ts              the way in, from any other folder
 │   ├── organization/ · membership/ · otp/ · role/
-│   └── permission/ · workspace/  a contract with no behaviour is still a folder
+│   └── permission/ · workspace/  the same six files, with no exception
 ├── support/
 │   ├── iam.permissions.ts        what no single aggregate owns
 │   └── iam.contracts.ts          what the package publishes as `./contracts`
@@ -239,8 +239,17 @@ domains/iam/src/
   `UserRecord` next to it names the same shape twice. Where the row is needed —
   the entity's constructor, the repository's cast, the mock's overrides — it is
   `z.infer<typeof userSchema>`, derived in the file that needs it.
-- **Where there is no entity, the plain name is free.** `role/` publishes `Role`,
-  `permission/` publishes `Permission`: nothing else holds the name.
+- **Every aggregate is the same six files.** Schema, types, entity, repository,
+  mock, barrel — including the ones that look like they need less. A workspace
+  with no repository is a use case reaching the table directly, which is what
+  the layering forbids; an aggregate with no entity is a row with nowhere to put
+  its invariants.
+- **A pure helper lives in its entity, as a static.** Hashing a password is
+  `User.hash`, slugging a name is `Organization.slugify`, minting a code is
+  `Otp.generateCode`. A `user.password.ts` beside the entity is a second place
+  the reader has to find, and the entity is already the thing that owns the
+  rule. What no aggregate owns — the scrypt primitive both the password and the
+  code use — goes to `support/`.
 - **The operation's contract is the operation's.** `sign-up.schema.ts` sits with
   `sign-up.ts`; the row schema sits with the aggregate whose row it describes
   (`PRJ-5`).
