@@ -11,7 +11,8 @@ Folders exist when they hold real code; the CLI does not create empty zones.
 
 ---
 
-**Rules defined here:** `PRJ-1` · `PRJ-2` · `PRJ-3` · `PRJ-L1` — the law is
+**Rules defined here:** `PRJ-1` · `PRJ-2` · `PRJ-3` · `PRJ-4` · `PRJ-5` ·
+`PRJ-L1` — the law is
 the *Invariants* table below; every ❌ item cites the id it violates.
 
 ## 🌐 Generic pattern (portable — stack-independent)
@@ -38,6 +39,25 @@ folder holds its delivery point, its own configuration and nothing another app
 would need. The moment a second app needs the artifact, an app-owned copy is a
 fork. **[PRJ-3]**
 
+**PRJ-4 — every aggregate owns its own contract, and no file covers them all.**
+
+A domain with one aggregate keeps its files at its root. A domain with several
+gives each its own folder, and each folder declares the row it owns and the
+closed sets that row uses. There is no schema or types file for the whole
+domain: a file every folder imports from is a file every folder is coupled to,
+and the enum an operation needs stops being findable from the operation that
+needs it. A row is inferred where it is used rather than published beside the
+entity under a second name — the entity already holds that name, and two names
+for one shape is the pair that drifts. **[PRJ-4]**
+
+**PRJ-5 — an operation is a folder, and the shape it accepts lives in it.**
+
+One operation, one folder: the operation, the shape it accepts and a barrel. The
+barrel is what the domain's own index imports, so adding a file to an operation
+never changes the line that exports it. The shape belongs to the operation
+rather than to the aggregate, because it is what the boundary accepts and not
+what the table holds. **[PRJ-5]**
+
 ### Invariants (the law the gates enforce)
 
 
@@ -46,6 +66,8 @@ fork. **[PRJ-3]**
 | PRJ-1 | Inside a domain: schema → entity → repository → use-case → controller/handler | constitutional | `gate:folder-shape` | Domain anatomy / ❌ |
 | PRJ-2 | A shared capability is registered once at the consuming app's root, never wrapped again | constitutional | `gate:single-registration` | Dependency injection / ❌ |
 | PRJ-3 | Schema, migration, entity and use-case live in a package, never inside a delivery app | constitutional | `gate:shared-artifact-placement` | The tree / ❌ |
+| PRJ-4 | A domain with more than one aggregate gives each its own folder under `entities/`; no schema or types file covers the whole domain | constitutional | `gate:domain-anatomy` | Domain anatomy / ❌ |
+| PRJ-5 | An operation is a folder holding the operation and a barrel; its input contract lives there too | constitutional | `gate:domain-anatomy` | Domain anatomy / ❌ |
 | PRJ-L1 | `@turystack/backend-config` is the source of truth for lint, format and TypeScript; a project never redefines those rules locally | stack lint | `gate:config-extends` | Dependency injection / ❌ |
 
 Ids are stable across versions. A gap in the numbering is a law that moved to
@@ -177,10 +199,68 @@ multi-table aggregate, a specific query, soft delete or entity hydration. For
 trivial operations already covered by the `DatabaseService` typed repository, do
 not add an interface and a wrapper with no behavior.
 
+### A domain with more than one aggregate
+
+The tree above is a domain with one aggregate, and most have one. A domain that
+holds several — identity holds the person, the organizations they act for, the
+roles those carry and the codes they sign in with — gives each its own folder
+under `entities/`, with the files the single-aggregate domain keeps at its root:
+
+```text
+domains/iam/src/
+├── entities/
+│   ├── user/
+│   │   ├── user.schema.ts        the row it owns, and the closed sets that row uses
+│   │   ├── user.types.ts         what those sets are called in TypeScript
+│   │   ├── user.entity.ts        the invariants
+│   │   ├── user.repository.ts    rows in and out
+│   │   ├── user.mock.ts          the builder a test writes with
+│   │   └── user.password.ts      a pure helper with a single owner
+│   ├── organization/ · membership/ · otp/ · role/
+│   └── permission/ · workspace/  a contract with no behaviour is still a folder
+├── support/
+│   ├── iam.permissions.ts        what no single aggregate owns
+│   └── iam.contracts.ts          what the package publishes as `./contracts`
+├── use-cases/
+│   └── sign-up/
+│       ├── sign-up.schema.ts     the shape the operation accepts
+│       ├── sign-up.types.ts      its input, inferred from that schema
+│       ├── sign-up.ts            the operation
+│       ├── sign-up.test.ts
+│       └── index.ts              what the domain's own barrel imports
+└── index.ts
+```
+
+- **No file covers the whole domain.** An `iam.schema.ts` holding every row is a
+  file every folder imports from, and the enum an operation needs stops being
+  findable from the operation (`PRJ-4`).
+- **A row is not published beside its entity.** `User` is the entity; a
+  `UserRecord` next to it names the same shape twice. Where the row is needed —
+  the entity's constructor, the repository's cast, the mock's overrides — it is
+  `z.infer<typeof userSchema>`, derived in the file that needs it.
+- **Where there is no entity, the plain name is free.** `role/` publishes `Role`,
+  `permission/` publishes `Permission`: nothing else holds the name.
+- **The operation's contract is the operation's.** `sign-up.schema.ts` sits with
+  `sign-up.ts`; the row schema sits with the aggregate whose row it describes
+  (`PRJ-5`).
+- **What leaves the package is the contracts and the operations.** The entities
+  and the repositories are how the domain works, not what it offers — the barrel
+  exports neither (`ARC-LAY-4`, `ARC-LAY-5`).
+- **The order still runs one way** (`PRJ-1`): an aggregate's schema and types are
+  imported by its entity, its repository and any operation; an operation's schema
+  is imported by that operation and by the contracts barrel, and by nothing else.
+
+Two operations here have no `*.types.ts`, and that is the rule rather than an
+exception to it: `resolve-profile` implements a signature the IAM library owns
+and `seed-iam` takes nothing. A file that exists to satisfy a pattern rather
+than to hold something is the `.gitkeep` `ARC-TOP-4` refuses.
+
 `support/` is allowed for pure functions with no domain owner — for example,
 cross-cutting normalization used by several domains and still specific to the
 product. It takes no business rule, infrastructure client, logger,
-configuration or lib wrapper. Code shared across apps is born as an explicit
+configuration or lib wrapper. Inside a domain the same word means the same
+thing one level down: what no single aggregate owns, such as a catalogue that
+spans three of them. What one aggregate could own belongs to that aggregate. Code shared across apps is born as an explicit
 package (`packages/support`) only once the reuse exists — never in advance.
 
 ### Dependency injection
@@ -240,4 +320,7 @@ application (`ARC-LAY-8`) — see `07-adapters.md`.
 - `[PRJ-3]` Put a schema, a migration, an entity or a use case inside a delivery app.
 - `[ARC-TOP-6]` Read `process.env` in a controller, use-case, repository, adapter or `main.ts`.
 - `[PRJ-1]` Have an entity import its repository, or a repository import a use-case.
+- `[PRJ-4]` Keep one `<domain>.schema.ts` or `<domain>.types.ts` for a domain that holds several aggregates.
+- `[PRJ-4]` Publish a `UserRecord` beside the `User` entity — infer the row where it is used.
+- `[PRJ-5]` Put an operation's input schema in the aggregate's schema file, or leave an operation without its barrel.
 - `[PRJ-L1]` Redefine lint/format/TypeScript rules locally instead of extending `@turystack/backend-config`.
