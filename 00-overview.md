@@ -18,8 +18,8 @@ There is one shape, so there is nothing to detect before writing code:
 | | Lives in |
 |---|---|
 | A domain | `domains/<name>/src/` — one package, `@acme/<name>` |
-| The error catalogue | `packages/exceptions` — `@acme/exceptions` |
-| Persistence | `packages/database` — `@acme/database` |
+| The error catalogue | `domains/<name>/src/support/<name>.exceptions.ts` — published by that domain |
+| Persistence | `libs/database` — `@acme/database` |
 | HTTP | `apps/<api>/src/controllers/<audience>/` |
 | Events | a handler app, with `@Handler('EVENTBRIDGE')` or `@Handler('SQS')` |
 | Schedule | a handler app, with `@Handler('SCHEDULE')` — the cron is the rule, not code |

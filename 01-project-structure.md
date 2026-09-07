@@ -132,14 +132,15 @@ domains/                          one package per domain
         ├── order.entity.ts
         ├── order.repository.ts
         ├── order.mock.ts
+        ├── support/
+        │   └── order.exceptions.ts
         ├── use-cases/
         │   └── create-order/
         │       ├── create-order.ts
         │       ├── create-order.types.ts
         │       └── create-order.test.ts
         └── index.ts
-packages/                         shared: backend, frontend, or both
-├── exceptions/                   @acme/exceptions — the one catalogue
+libs/                             shared: backend, frontend, or both
 ├── database/                     @acme/database — schema, relations, drizzle/
 ├── ui/                           @acme/ui — the theme, as one stylesheet
 ├── oauth-clients/                @acme/oauth-clients — who may sign a person in
@@ -175,13 +176,13 @@ someone has to notice into something the toolchain refuses:
 - Reaching past a barrel is a resolution error, not a convention: `@acme/order`
   resolves to what `index.ts` exports and to nothing else.
 
-The catalogue lives in `packages/exceptions` for the same reason. Kept inside
-one domain, every other domain would have to depend on that domain just to raise
-an error.
+Each domain publishes its own codes, under its own name (`ARC-ERR-1`): the
+prefix is the domain's, one package cannot be two domains, and the code is
+declared beside the rule that raises it.
 
-- `@acme/<domain>` holds that domain's schema, entity, repository, use-cases and
-  events — and exports the use cases, which is its public surface.
-- `@acme/exceptions` holds the product's one error catalogue.
+- `@acme/<domain>` holds that domain's schemas, entities, repositories, use
+  cases and codes — and exports the use cases, the schemas and the codes, which
+  is its public surface.
 - `@acme/database` holds the schema, relations, migrations and the
   `DatabaseService` augmentation.
 - APIs and handlers are delivery apps: they compose modules and import
@@ -261,7 +262,7 @@ product. It takes no business rule, infrastructure client, logger,
 configuration or lib wrapper. Inside a domain the same word means the same
 thing one level down: what no single aggregate owns, such as a catalogue that
 spans three of them. What one aggregate could own belongs to that aggregate. Code shared across apps is born as an explicit
-package (`packages/support`) only once the reuse exists — never in advance.
+package (`libs/support`) only once the reuse exists — never in advance.
 
 ### Dependency injection
 

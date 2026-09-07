@@ -124,7 +124,7 @@ export class OrderRepository {
 
 ### Database placement
 
-- `packages/database`, shared by every app and by the migration CLI. It is a
+- `libs/database`, shared by every app and by the migration CLI. It is a
   package rather than a folder in the API because a handler app, a second API
   and drizzle-kit all read the same schema.
 - Schema, relations, migrations, config and augmentation follow the
