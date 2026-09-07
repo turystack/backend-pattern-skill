@@ -17,9 +17,9 @@ There is one shape, so there is nothing to detect before writing code:
 
 | | Lives in |
 |---|---|
-| A domain | `domains/<name>/src/` — one package, `@repo/<name>` |
-| The error catalogue | `packages/exceptions` — `@repo/exceptions` |
-| Persistence | `packages/database` — `@repo/database` |
+| A domain | `domains/<name>/src/` — one package, `@acme/<name>` |
+| The error catalogue | `packages/exceptions` — `@acme/exceptions` |
+| Persistence | `packages/database` — `@acme/database` |
 | HTTP | `apps/<api>/src/controllers/<audience>/` |
 | Events | a handler app, with `@Handler('EVENTBRIDGE')` or `@Handler('SQS')` |
 | Schedule | a handler app, with `@Handler('SCHEDULE')` — the cron is the rule, not code |

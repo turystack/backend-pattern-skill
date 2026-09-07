@@ -69,7 +69,7 @@ shares its deploy, its scaling and its failure mode — which is the definition
 
 - A handler is an isolated delivery point and uses `@Handler` from
   `@turystack/nestjs-serverless`.
-- It imports operations from the domain packages it delivers — `@repo/order`,
+- It imports operations from the domain packages it delivers — `@acme/order`,
   not a copy — and registers only the provider closure that handler needs.
 - It owns its `config.schema.ts`; it does not read `process.env` inside the
   handler.

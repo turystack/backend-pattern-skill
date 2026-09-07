@@ -50,7 +50,7 @@ What follows is how the Turystack backend expresses them.
 
 | ID | Law | How this stack expresses it |
 |---|---|---|
-| `ARC-ERR-1` | One catalogue per product, never one per module. | `@repo/exceptions`, imported by every domain and every app |
+| `ARC-ERR-1` | One catalogue per product, never one per module. | `@acme/exceptions`, imported by every domain and every app |
 | `ARC-ERR-2` | The code is the contract; the message is human. | the client branches on `code`, never on the message |
 | `ARC-ERR-3` | Thrown with a category class and a catalogue key, never a literal. | `throw new exceptions.order.notFound({ orderId })` |
 | `ARC-ERR-4` | The category decides the layer. | the four-line map above |

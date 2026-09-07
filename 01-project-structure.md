@@ -101,8 +101,8 @@ apps/
         ├── config.schema.ts
         └── main.ts
 domains/                          one package per domain
-├── identity/                     @repo/identity
-└── order/                        @repo/order
+├── identity/                     @acme/identity
+└── order/                        @acme/order
     ├── package.json
     └── src/
         ├── order.schema.ts
@@ -117,10 +117,10 @@ domains/                          one package per domain
         │       └── create-order.test.ts
         └── index.ts
 packages/                         shared: backend, frontend, or both
-├── exceptions/                   @repo/exceptions — the one catalogue
-├── database/                     @repo/database — schema, relations, drizzle/
-├── ui/                           @repo/ui — the theme, as one stylesheet
-├── oauth-clients/                @repo/oauth-clients — who may sign a person in
+├── exceptions/                   @acme/exceptions — the one catalogue
+├── database/                     @acme/database — schema, relations, drizzle/
+├── ui/                           @acme/ui — the theme, as one stylesheet
+├── oauth-clients/                @acme/oauth-clients — who may sign a person in
 └── support/                      only once the reuse actually exists
 ```
 
@@ -131,27 +131,36 @@ packages/                         shared: backend, frontend, or both
   It stays one app: `ARC-TOP-1` gives an app its own lifecycle, and two
   audiences that deploy together do not have one.
 
+### The scope
+
+Every package the repository owns is scoped by the repository's own name —
+`@acme/order`, `@acme/database` — and `acme` above stands in for whatever the
+product is called. A fixed scope such as `@repo` reads the same in every
+repository on the machine, which is exactly when it stops carrying information:
+the import says a package is internal, and nothing about which product it is
+internal to.
+
 ### One package per domain
 
 A domain is a package, not a folder. That is what turns `ARC-LAY-4` from a rule
 someone has to notice into something the toolchain refuses:
 
 - Depending on another domain is a line in `package.json` —
-  `"@repo/billing": "workspace:*"` — so the dependency is declared where
+  `"@acme/billing": "workspace:*"` — so the dependency is declared where
   dependencies are read, and it shows up in review as one.
 - A cycle between two domains fails `tsc -b`. The build orders the packages by
   their references, and a reference cycle has no order.
-- Reaching past a barrel is a resolution error, not a convention: `@repo/order`
+- Reaching past a barrel is a resolution error, not a convention: `@acme/order`
   resolves to what `index.ts` exports and to nothing else.
 
 The catalogue lives in `packages/exceptions` for the same reason. Kept inside
 one domain, every other domain would have to depend on that domain just to raise
 an error.
 
-- `@repo/<domain>` holds that domain's schema, entity, repository, use-cases and
+- `@acme/<domain>` holds that domain's schema, entity, repository, use-cases and
   events — and exports the use cases, which is its public surface.
-- `@repo/exceptions` holds the product's one error catalogue.
-- `@repo/database` holds the schema, relations, migrations and the
+- `@acme/exceptions` holds the product's one error catalogue.
+- `@acme/database` holds the schema, relations, migrations and the
   `DatabaseService` augmentation.
 - APIs and handlers are delivery apps: they compose modules and import
   operations from the domain packages they actually deliver.
