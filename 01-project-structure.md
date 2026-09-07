@@ -221,7 +221,8 @@ domains/iam/src/
 │   └── permission/ · workspace/  the same six files, with no exception
 ├── support/
 │   ├── iam.permissions.ts        what no single aggregate owns
-│   └── iam.contracts.ts          what the package publishes as `./contracts`
+│   ├── iam.exceptions.ts         the codes this domain publishes
+│   └── iam.seed.ts               brings the database in line with the catalogue
 ├── use-cases/
 │   └── sign-up/
 │       ├── sign-up.schema.ts     the shape the operation accepts
@@ -250,6 +251,9 @@ domains/iam/src/
   the reader has to find, and the entity is already the thing that owns the
   rule. What no aggregate owns — the scrypt primitive both the password and the
   code use — goes to `support/`.
+- **A bootstrap is not an operation.** The seed exists to make the database
+  agree with the catalogue in the source; nobody calls it to get something done,
+  and it belongs beside the catalogue it mirrors rather than in `use-cases/`.
 - **The operation's contract is the operation's.** `sign-up.schema.ts` sits with
   `sign-up.ts`; the row schema sits with the aggregate whose row it describes
   (`PRJ-5`).
