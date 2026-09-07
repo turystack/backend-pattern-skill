@@ -50,7 +50,7 @@ What follows is how the Turystack backend expresses them.
 
 | ID | Law | How this stack expresses it |
 |---|---|---|
-| `ARC-ERR-1` | One catalogue per product, never one per module. | `@acme/exceptions`, imported by every domain and every app |
+| `ARC-ERR-1` | A domain owns its codes and publishes them, under its own name. | `domains/<name>/src/support/<name>.exceptions.ts`, exported by that domain's barrel |
 | `ARC-ERR-2` | The code is the contract; the message is human. | the client branches on `code`, never on the message |
 | `ARC-ERR-3` | Thrown with a category class and a catalogue key, never a literal. | `throw new exceptions.order.notFound({ orderId })` |
 | `ARC-ERR-4` | The category decides the layer. | the four-line map above |
@@ -75,9 +75,9 @@ Treating the five as two is the same bug the frontend makes, under another name.
 
 **Mechanisms per rule (NestJS):**
 
-- **ARC-ERR-1** — a single `src/exceptions.ts` with `createExceptions` from `@turystack/exceptions`; never `src/domains/x/x.exceptions.ts`. The same file declares `export type Exceptions = InferExceptionCodes<typeof exceptions>` — the union of **every** code the API can return. There is no translation dictionary: the error body comes out of the global `AppErrorTransform` of `Server.create` as `{ statusCode, code, message, ...metadata }`, with `code` = the stable catalogue code (the client translates by code, if it wants to). In OpenAPI, every error response references the model named **`Exception`** in `components.schemas` (registered by `Server.create`) — the generated SDK gets a single `Exception` type.
+- **ARC-ERR-1** — `domains/<name>/src/support/<name>.exceptions.ts` with `createExceptions` from `@turystack/exceptions`, its module named after the domain, exported by that domain's barrel as `<name>Exceptions`. The same file declares `export type <Name>ExceptionCode = InferExceptionCodes<typeof exceptions>` — the union of **every** code the API can return. There is no translation dictionary: the error body comes out of the global `AppErrorTransform` of `Server.create` as `{ statusCode, code, message, ...metadata }`, with `code` = the stable catalogue code (the client translates by code, if it wants to). In OpenAPI, every error response references the model named **`Exception`** in `components.schemas` (registered by `Server.create`) — the generated SDK gets a single `Exception` type.
 - **ERR-L1** — `e.module('order', { conflict: ['already_paid'] })` — `createExceptions` injects `notFound` (code `order.not_found`) into every module; it never shows up in the groups.
-- **ARC-ERR-3** — the builder generates **one class per code**, grouped by **HTTP semantics** (`conflict`, `unprocessableEntity`…): `throw new exceptions.order.alreadyPaid({ orderId })`. Each class carries a stable `code` (`order.already_paid`), a status and `metadata` — never `throw new Error('string')` nor a loose message.
+- **ARC-ERR-3** — the builder generates **one class per code**, grouped by **HTTP semantics** (`conflict`, `unprocessableEntity`…): `throw new orderExceptions.alreadyPaid({ orderId })`. Each class carries a stable `code` (`order.already_paid`), a status and `metadata` — never `throw new Error('string')` nor a loose message.
 - **ARC-ERR-4** — 400 → Zod on the route; 404 → use-case (the repositories from `@turystack/nestjs-database` already throw `RecordNotFoundError`/`RecordNotCreatedError`, codes `record_not_found`/`record_not_created`); 409 → entity guard; 401/403 → `IamUnauthorizedException`/`IamForbiddenException` from `@turystack/nestjs-iam`. Table of the groups below; ★ marks the ones on the validation ladder.
 
 **Available groups (`createExceptions` · `@turystack/exceptions`) — the ★ ones belong to this architecture's validation ladder:**
