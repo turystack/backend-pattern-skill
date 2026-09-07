@@ -2,19 +2,26 @@
 
 **Concept.** Ports & adapters: every external dependency (storage, email, payment gateway, OAuth, maps) sits behind a **main interface** owned by the application. An **adapter implements a concrete external provider** obeying that interface; the core depends on the abstraction, the provider is a swappable detail.
 
-> **How to read this file.** Two parts, deliberately separated:
-> - **🌐 Generic pattern** — the **portable law**. Holds in any stack (NestJS, PHP, etc.); the text stays true even after swapping frameworks. This is what review enforces as an invariant.
-> - **🛠️ Project-specific** — the **code** that implements each rule in the current stack (TypeScript · NestJS · @turystack · Drizzle · Zod). Swapping stacks rewrites **only** this part; the law above does not change.
->
-> Each rule carries an id `ADP-n` linking the law (generic) to the code (specific). Gates bind by **id**, not by file/line. `ADP-L*` rules are **stack lints**: they exist only because of the current language's ergonomics (they invert in another stack), but they stay id-registered and enforced in this project.
+> **How to read this file.** 🌐 Generic pattern is the portable law; 🛠️
+> Project-specific is that same law expressed as code in TypeScript · NestJS ·
+> @turystack · Drizzle · Zod. The split, `XXX-n` versus `XXX-Ln`, and why an
+> `ARC-…` law is cited and never restated: `turystack-backend-pattern` › *How
+> a section is written*.
 
 ---
 
+**Rules defined here:** `ADP-2` · `ADP-3` · `ADP-4` · `ADP-5` · `ADP-6` ·
+`ADP-L1` — the law is the *Invariants* table below; every ❌ item cites the id
+it violates.
+
+**Retired ids:** `ADP-1` — retired, not renumbered. A review or commit citing
+one points at a rule that no longer exists; the number is never reused.
+
 ## 🌐 Generic pattern (portable — stack-independent)
 
-**ARC-14 — interface owned by the application.**
+**ARC-LAY-8 — interface owned by the application.**
 
-Every external dependency (storage, email, payment gateway, OAuth) sits behind an **interface owned by the application** — not by the provider. The core depends on the abstraction; the provider is a detail swappable by configuration or injection. **[ARC-14]**
+Every external dependency (storage, email, payment gateway, OAuth) sits behind an **interface owned by the application** — not by the provider. The core depends on the abstraction; the provider is a detail swappable by configuration or injection. **[ARC-LAY-8]**
 
 **ADP-2 — injection via token/interface; never direct instantiation.**
 
@@ -42,26 +49,25 @@ Strategies are a form of adapter and defer the resolution details here (see `07-
 
 ### Invariants (the law the gates enforce)
 
-> Bind by **id**. `constitutional` = portable invariant (holds in any stack). `stack lint` = exists only because of the current language's ergonomics and inverts in another stack — still id-registered and enforced here. The **detector** (how the gate catches the violation) is project-specific and lives in the 🛠️ part below.
 
-| ID | Law (one line) | Type | Detector (🛠️) |
-|---|---|---|---|
-| ADP-2 | Adapter injected via token/interface; never instantiated directly by the caller | constitutional | Forms 1–3 / ❌ |
-| ADP-3 | Adapter with no business logic; does not know the domain schema | constitutional | ❌ |
-| ADP-4 | Provider client received via DI; never created inside the concrete implementation | constitutional | Form 1 / ❌ |
-| ADP-5 | Strategy via `Record<Provider, IAdapter>`; never an inline if/switch | constitutional | Forms 2–3 / ❌ |
-| ADP-6 | Three forms: direct / strategy-payload / strategy-internal; question which one; Strategies = a form of adapter (see 07-adapters.md) | constitutional | Forms 1–3 |
-| ADP-L1 | Structure: `src/adapters/{name}/` with `.interface.ts`, `.types.ts`, `.service.ts`, `.module.ts` (optional), `{provider}/{provider}.adapter.ts` | stack lint | Form 1 |
+| ID | Law (one line) | Class | Gate | Detector (🛠️) |
+|---|---|---|---|---|
+| ADP-2 | Adapter injected via token/interface; never instantiated directly by the caller | constitutional | `grit:no-adapter-new` | Forms 1–3 / ❌ |
+| ADP-3 | Adapter with no business logic; does not know the domain schema | constitutional | `biome:noRestrictedImports` | ❌ |
+| ADP-4 | Provider client received via DI; never created inside the concrete implementation | constitutional | `grit:no-client-in-adapter` | Form 1 / ❌ |
+| ADP-5 | Strategy via `Record<Provider, IAdapter>`; never an inline if/switch | constitutional | `grit:no-provider-switch` | Forms 2–3 / ❌ |
+| ADP-6 | Three forms: direct / strategy-payload / strategy-internal; question which one; Strategies = a form of adapter (see 07-adapters.md) | constitutional | `manual` | Forms 1–3 |
+| ADP-L1 | Structure: `src/adapters/{name}/` with `.interface.ts`, `.types.ts`, `.service.ts`, `.module.ts` (optional), `{provider}/{provider}.adapter.ts` | stack lint | `gate:adapter-structure` | Form 1 |
 
 ## Governed by the constitution
 
-These laws live in `tury-stack-architecture-pattern` and are not restated here.
+These laws live in `turystack-architecture-pattern` and are not restated here.
 What follows in this section is how the Turystack backend expresses them.
 
-| ID | Law |
-|---|---|
-| `ARC-14` | Lib used directly; integration without a lib behind an interface of its own. |
-| `ARC-LAY-2` | Domain declares what it needs, not who does it. |
+| ID | Law | How this stack expresses it |
+|---|---|---|
+| `ARC-LAY-8` | Lib used directly; integration without a lib behind an interface of its own. | a `@turystack/*` service is injected as-is; only an unowned integration gets an interface + `Symbol` |
+| `ARC-LAY-2` | Domain declares what it needs, not who does it. | the domain declares the port; the app registers the implementation |
 
 
 ---
@@ -72,11 +78,11 @@ What follows in this section is how the Turystack backend expresses them.
 >
 > **⚠️ Comments in the examples are didactic** — they explain the rule being demonstrated. **Never copy a comment into real code**: the standard is zero comments (see Code Quality).
 
-**Library × adapter boundary (decide BEFORE creating any adapter).** Infra that a `@turystack` lib covers — cache (`nestjs-cache`), lock (`nestjs-lock`), rate-limit (`nestjs-rate-limit`), storage (`nestjs-storage`), tokens/IAM (`nestjs-iam`), social-auth (`nestjs-social-auth`), messaging (`nestjs-publisher`), database (`nestjs-database`), logs (`nestjs-logger`) — **never becomes an adapter**: register the lib's module **once at the root** and inject its service. The lib **already is** the interface owned by the application (ARC-14), with the provider as a detail swappable by configuration. `src/adapters/` exists **only** for an integration no lib covers — payment gateway, maps, postal-code lookup — and those follow the pattern below in full.
+**Library × adapter boundary (decide BEFORE creating any adapter).** Infra that a `@turystack` lib covers — cache (`nestjs-cache`), lock (`nestjs-lock`), rate-limit (`nestjs-rate-limit`), storage (`nestjs-storage`), tokens/IAM (`nestjs-iam`), social-auth (`nestjs-social-auth`), messaging (`nestjs-publisher`), database (`nestjs-database`), logs (`nestjs-logger`) — **never becomes an adapter**: register the lib's module **once at the root** and inject its service. The lib **already is** the interface owned by the application (ARC-LAY-8), with the provider as a detail swappable by configuration. `src/adapters/` exists **only** for an integration no lib covers — payment gateway, maps, postal-code lookup — and those follow the pattern below in full.
 
 **Mechanisms per rule (NestJS):**
 
-- **ARC-14** — `export const PAYMENT_ADAPTER = Symbol('PAYMENT_ADAPTER')` + `export interface IPaymentAdapter`; the service depends on `IPaymentAdapter`, never on the concrete implementation. Infra covered by a `@turystack` lib: the interface is already the lib's — do not create another one on top.
+- **ARC-LAY-8** — `export const PAYMENT_ADAPTER = Symbol('PAYMENT_ADAPTER')` + `export interface IPaymentAdapter`; the service depends on `IPaymentAdapter`, never on the concrete implementation. Infra covered by a `@turystack` lib: the interface is already the lib's — do not create another one on top.
 - **ADP-2** — `@Inject(PAYMENT_ADAPTER) private readonly adapter: IPaymentAdapter`; never `new StripeAdapter()`.
 - **ADP-3** — the concrete implementation imports nothing from domains; the interface uses only types from `{name}.types.ts`.
 - **ADP-4** — client bootstrap in `{name}.module.ts` via `useFactory`; the concrete implementation receives the ready client via `@Inject`.
@@ -95,7 +101,7 @@ src/adapters/{name}/
 
 ### ✅ How to do it
 
-**Form 1 — direct adapter (1 provider):** `[ARC-14, ADP-2, ADP-6, ADP-L1]`
+**Form 1 — direct adapter (1 provider):** `[ARC-LAY-8, ADP-2, ADP-6, ADP-L1]`
 ```typescript
 @Injectable()
 export class ZipCodeService {
@@ -107,7 +113,7 @@ export class ZipCodeService {
 }
 ```
 
-**Form 2 — strategy via payload `(provider, input)`:** `[ARC-14, ADP-2, ADP-5, ADP-6]`
+**Form 2 — strategy via payload `(provider, input)`:** `[ARC-LAY-8, ADP-2, ADP-5, ADP-6]`
 ```typescript
 @Injectable()
 export class PaymentService {
@@ -122,7 +128,7 @@ export class PaymentService {
 }
 ```
 
-**Form 3 — strategy via internal business rule (no provider in the payload):** `[ARC-14, ADP-2, ADP-5, ADP-6]`
+**Form 3 — strategy via internal business rule (no provider in the payload):** `[ARC-LAY-8, ADP-2, ADP-5, ADP-6]`
 ```typescript
 @Injectable()
 export class PaymentService {
@@ -164,4 +170,8 @@ export class LibCacheAdapter implements ICacheAdapter {
 }
 ```
 
-🔵 **Proposed** — Retry / Timeout / Circuit Breaker in the adapter's service/module (timeout per call; retry with backoff; breaker per provider). ✍️ limits and libs to be provided.
+**Resilience belongs to this boundary.** The adapter is the port, so the
+timeout, the retry policy and the circuit breaker are declared on its methods —
+never at the call site. `@turystack/nestjs-resilience` owns the decorators;
+`14-resilience.md` owns the decision of what to apply, how to size the budget
+and when an operation degrades instead of failing (`RSL-1`, `ARC-RES-1`).

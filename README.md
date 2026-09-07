@@ -24,6 +24,8 @@ pnpm add -D @turystack/backend-pattern
 - [Security](11-security.md)
 - [Testing](12-testing.md)
 - [Telemetry Policy](13-telemetry.md)
+- [Resilience](14-resilience.md)
+- [Idempotency](15-idempotency.md)
 - [Skill manifest](SKILL.md)
 
 ## Documentation

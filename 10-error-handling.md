@@ -2,23 +2,25 @@
 
 **Concept.** A business error is typed and mapped to a stable API status/code; never a loose string, never a leaking stack. A central catalogue keeps codes and messages consistent across domains.
 
-> **How to read this file.** Two parts, deliberately separated:
-> - **🌐 Generic pattern** — the **portable law**. Holds in any stack (NestJS, PHP, etc.); the text stays true even after swapping frameworks. This is what review enforces as an invariant.
-> - **🛠️ Project-specific** — the **code** that implements each rule in the current stack (TypeScript · NestJS · @turystack · Drizzle · Zod). Swapping stacks rewrites **only** this part; the law above does not change.
->
-> Each rule carries an id `ERR-n` linking the law (generic) to the code (specific). Gates bind by **id**, not by file/line. `ERR-L*` rules are **stack lints**: they exist only because of the current language's ergonomics (they invert in another stack), but they stay id-registered and enforced in this project.
+> **How to read this file.** 🌐 Generic pattern is the portable law; 🛠️
+> Project-specific is that same law expressed as code in TypeScript · NestJS ·
+> @turystack · Drizzle · Zod. The split, `XXX-n` versus `XXX-Ln`, and why an
+> `ARC-…` law is cited and never restated: `turystack-backend-pattern` › *How
+> a section is written*. Almost every rule here is constitutional and cited as
+> `ARC-ERR-n`: what an error catalogue owes its consumers does not change when
+> the framework does. Only `ERR-L1` is local — a **stack lint**, existing
+> because of what `@turystack/exceptions` provides, and enforced here all the
+> same.
 
 ---
 
+**Rules defined here:** `ERR-L1` — the law is the *Invariants* table below;
+every ❌ item cites the id it violates.
+
 ## 🌐 Generic pattern (portable — stack-independent)
 
-**ERR-1 — single central catalogue.** There is one error catalogue per project, not one file per module. Keys in `snake_case`. **[ERR-1]**
-
-**ERR-2 — automatic `not_found`.** Every module gets `not_found` automatically; never declare it by hand in the module's key list. **[ERR-2]**
-
-**ERR-3 — category class + catalogue key.** Every business exception is thrown with: (a) the typed class matching the error's **category** and (b) the catalogue key — never a string literal. **[ERR-3]**
-
-**ERR-4 — category → layer mapping.** The layer that throws each error category is fixed by the architecture: **[ERR-4]**
+**The layer that throws each category is fixed** — this is `ARC-ERR-4` at the
+granularity of the backend's HTTP statuses:
 
 - **invalid input (400)** → edge/route (schema validation).
 - **not found (404)** → use-case (FK/PK existence check).
@@ -29,27 +31,33 @@
 
 ### Invariants (the law the gates enforce)
 
-> Bind by **id**. `constitutional` = portable invariant (holds in any stack). `stack lint` = exists only because of the current language's ergonomics and inverts in another stack — still id-registered and enforced here. The **detector** (how the gate catches the violation) is project-specific and lives in the 🛠️ part below.
 
-| ID | Law (one line) | Class | Detector (🛠️) |
-|---|---|---|---|
-| ERR-1 | One catalogue per project; `snake_case` keys; never an exceptions file per module | constitutional | Scenario 1 / ❌ |
-| ERR-2 | `not_found` automatic per module; never declared by hand in the key array | constitutional | Scenario 1 / ❌ |
-| ERR-3 | Throw with category class + catalogue key; never a string literal | constitutional | Scenarios 1–2 / ❌ |
+| ID | Law (one line) | Class | Gate | Detector (🛠️) |
+|---|---|---|---|---|
+| ERR-L1 | Catalogue keys in `snake_case`; `not_found` is provided per module by the library and never hand-declared in the key array | stack lint | `grit:no-blind-error-cast` | Scenario 1 / ❌ |
+
+**Where the old local ids went.** `ERR-1`, `ERR-3` and `ERR-4` restated laws the
+constitution already owned, which meant one law with two ids and a gate that
+could bind to either. They map as `ERR-1`→`ARC-ERR-1`, `ERR-3`→`ARC-ERR-3`,
+`ERR-4`→`ARC-ERR-4`. What was genuinely local — the key convention and the
+library-provided `not_found` — survives as the stack lint `ERR-L1` (it was
+`ERR-2`).
 
 ## Governed by the constitution
 
-These laws live in `tury-stack-architecture-pattern` and are not restated here.
-What follows in this section is how the Turystack backend expresses them.
+These laws live in `turystack-architecture-pattern` and are not restated here.
+What follows is how the Turystack backend expresses them.
 
-| ID | Law |
-|---|---|
-| `ARC-ERR-1` | One catalogue per product. |
-| `ARC-ERR-2` | The code is the contract; the message is human. |
-| `ARC-ERR-3` | Errors thrown with class and key. |
-| `ARC-ERR-4` | The category has a layer. |
-| `ARC-ERR-5` | Internal detail never reaches the client. |
-| `ARC-ERR-8` | A remote read has five outcomes; all of them decided. |
+| ID | Law | How this stack expresses it |
+|---|---|---|
+| `ARC-ERR-1` | One catalogue per product, never one per module. | `@repo/exceptions`, imported by every domain and every app |
+| `ARC-ERR-2` | The code is the contract; the message is human. | the client branches on `code`, never on the message |
+| `ARC-ERR-3` | Thrown with a category class and a catalogue key, never a literal. | `throw new exceptions.order.notFound({ orderId })` |
+| `ARC-ERR-4` | The category decides the layer. | the four-line map above |
+| `ARC-ERR-5` | Internal detail never reaches the client. | the filter serializes code + message; no stack, no SQL |
+| `ARC-ERR-6` | The consumer branches on the code, never on the message. | the published catalogue is what the frontend imports |
+| `ARC-ERR-7` | Every error becomes feedback or a propagated failure. | no empty `catch`, no catch that only logs |
+| `ARC-ERR-8` | A remote read has five outcomes; all of them decided. | applies when this backend consumes a third-party API |
 
 `ARC-ERR-8` applies whenever this backend is a **consumer**: a call to a
 third-party API, an adapter, an integration. An empty list is not a failure, a
@@ -67,10 +75,10 @@ Treating the five as two is the same bug the frontend makes, under another name.
 
 **Mechanisms per rule (NestJS):**
 
-- **ERR-1** — a single `src/exceptions.ts` with `createExceptions` from `@turystack/exceptions`; never `src/domains/x/x.exceptions.ts`. The same file declares `export type Exceptions = InferExceptionCodes<typeof exceptions>` — the union of **every** code the API can return. There is no translation dictionary: the error body comes out of the global `AppErrorTransform` of `Server.create` as `{ statusCode, code, message, ...metadata }`, with `code` = the stable catalogue code (the client translates by code, if it wants to). In OpenAPI, every error response references the model named **`Exception`** in `components.schemas` (registered by `Server.create`) — the generated SDK gets a single `Exception` type.
-- **ERR-2** — `e.module('order', { conflict: ['already_paid'] })` — `createExceptions` injects `notFound` (code `order.not_found`) into every module; it never shows up in the groups.
-- **ERR-3** — the builder generates **one class per code**, grouped by **HTTP semantics** (`conflict`, `unprocessableEntity`…): `throw new exceptions.order.alreadyPaid({ orderId })`. Each class carries a stable `code` (`order.already_paid`), a status and `metadata` — never `throw new Error('string')` nor a loose message.
-- **ERR-4** — 400 → Zod on the route; 404 → use-case (the repositories from `@turystack/nestjs-database` already throw `RecordNotFoundError`/`RecordNotCreatedError`, codes `record_not_found`/`record_not_created`); 409 → entity guard; 401/403 → `IamUnauthorizedException`/`IamForbiddenException` from `@turystack/nestjs-iam`. Table of the groups below; ★ marks the ones on the validation ladder.
+- **ARC-ERR-1** — a single `src/exceptions.ts` with `createExceptions` from `@turystack/exceptions`; never `src/domains/x/x.exceptions.ts`. The same file declares `export type Exceptions = InferExceptionCodes<typeof exceptions>` — the union of **every** code the API can return. There is no translation dictionary: the error body comes out of the global `AppErrorTransform` of `Server.create` as `{ statusCode, code, message, ...metadata }`, with `code` = the stable catalogue code (the client translates by code, if it wants to). In OpenAPI, every error response references the model named **`Exception`** in `components.schemas` (registered by `Server.create`) — the generated SDK gets a single `Exception` type.
+- **ERR-L1** — `e.module('order', { conflict: ['already_paid'] })` — `createExceptions` injects `notFound` (code `order.not_found`) into every module; it never shows up in the groups.
+- **ARC-ERR-3** — the builder generates **one class per code**, grouped by **HTTP semantics** (`conflict`, `unprocessableEntity`…): `throw new exceptions.order.alreadyPaid({ orderId })`. Each class carries a stable `code` (`order.already_paid`), a status and `metadata` — never `throw new Error('string')` nor a loose message.
+- **ARC-ERR-4** — 400 → Zod on the route; 404 → use-case (the repositories from `@turystack/nestjs-database` already throw `RecordNotFoundError`/`RecordNotCreatedError`, codes `record_not_found`/`record_not_created`); 409 → entity guard; 401/403 → `IamUnauthorizedException`/`IamForbiddenException` from `@turystack/nestjs-iam`. Table of the groups below; ★ marks the ones on the validation ladder.
 
 **Available groups (`createExceptions` · `@turystack/exceptions`) — the ★ ones belong to this architecture's validation ladder:**
 
@@ -94,7 +102,7 @@ Treating the five as two is the same bug the frontend makes, under another name.
 
 ### ✅ How to do it
 
-**Scenario 1 — central catalogue with `createExceptions`:** `[ERR-1, ERR-2, ERR-3]`
+**Scenario 1 — central catalogue with `createExceptions`:** `[ARC-ERR-1, ERR-L1, ARC-ERR-3]`
 ```typescript
 // src/exceptions.ts — central catalogue; snake_case codes grouped by HTTP semantics
 import { createExceptions } from '@turystack/exceptions'
@@ -107,7 +115,7 @@ export const exceptions = createExceptions((e) => ({
 }))
 ```
 
-**Scenario 2 — throw the typed class from the catalogue:** `[ERR-3]`
+**Scenario 2 — throw the typed class from the catalogue:** `[ARC-ERR-3]`
 ```typescript
 // use inside a use-case/entity — camelCase accessor, stable snake_case code
 import { exceptions } from '@/exceptions'
@@ -116,7 +124,7 @@ throw new exceptions.order.notFound({ orderId })      // auto — code order.not
 throw new exceptions.order.alreadyPaid({ orderId })   // code order.already_paid
 ```
 
-**Scenario 3 — the API's `Exceptions` type + a route documenting the classes it can return:** `[ERR-1, ERR-3]`
+**Scenario 3 — the API's `Exceptions` type + a route documenting the classes it can return:** `[ARC-ERR-1, ARC-ERR-3]`
 ```typescript
 // src/exceptions.ts — next to the catalogue: the union of every possible code
 import { createExceptions, type InferExceptionCodes } from '@turystack/exceptions'
@@ -142,12 +150,12 @@ export type Exceptions = InferExceptionCodes<typeof exceptions>
 ### ❌ Never do
 
 ```typescript
-// ❌ [ERR-3] loose string / generic class instead of the typed catalogue class
+// ❌ [ARC-ERR-3] loose string / generic class instead of the typed catalogue class
 throw new Error('Order not found')
 
-// ❌ [ERR-1] one exception file per module (must be a central catalogue)
+// ❌ [ARC-ERR-1] one exception file per module (must be a central catalogue)
 // src/domains/order/order.exceptions.ts
 
-// ❌ [ERR-2] declaring not_found by hand (it is automatic)
+// ❌ [ERR-L1] declaring not_found by hand (it is automatic)
 order: e.module('order', { notFound: ['not_found'], conflict: ['already_paid'] })
 ```

@@ -2,13 +2,20 @@
 
 **Concept.** Event-driven: the emitter announces that **something happened** (a fact in the past) and does not know who reacts; reactors subscribe. It decouples the side effect from the main flow. In-process (synchronous to the process) or distributed (broker).
 
-> **How to read this file.** Two parts, deliberately separated:
-> - **🌐 Generic pattern** — the **portable law**. Holds in any stack (NestJS, PHP, etc.); the text stays true even after swapping frameworks. This is what review enforces as an invariant.
-> - **🛠️ Project-specific** — the **code** that implements each rule in the current stack (TypeScript · NestJS · @turystack · Drizzle · Zod). Swapping stacks rewrites **only** this part; the law above does not change.
->
-> Each rule carries an id `EVT-n` linking the law (generic) to the code (specific). Gates bind by **id**, not by file/line. `EVT-L*` rules are **stack lints**: they exist only because of the current language's ergonomics (they invert in another stack), but they stay id-registered and enforced in this project.
+> **How to read this file.** 🌐 Generic pattern is the portable law; 🛠️
+> Project-specific is that same law expressed as code in TypeScript · NestJS ·
+> @turystack · Drizzle · Zod. The split, `XXX-n` versus `XXX-Ln`, and why an
+> `ARC-…` law is cited and never restated: `turystack-backend-pattern` › *How
+> a section is written*.
 
 ---
+
+**Rules defined here:** `EVT-1` · `EVT-3` · `EVT-4` · `EVT-5` · `EVT-6` ·
+`EVT-7` · `EVT-8` — the law is the *Invariants* table below; every
+❌ item cites the id it violates.
+
+**Retired ids:** `EVT-2` — retired, not renumbered. A review or commit citing
+one points at a rule that no longer exists; the number is never reused.
 
 ## 🌐 Generic pattern (portable — stack-independent)
 
@@ -51,32 +58,30 @@ A use-case never listens to its own event. The reactor is always another compone
 
 ### Invariants (the law the gates enforce)
 
-> Bind by **id**. `constitutional` = portable invariant (holds in any stack). `stack lint` = exists only because of the current language's ergonomics and inverts in another stack — still id-registered and enforced here. The **detector** (how the gate catches the violation) is project-specific and lives in the 🛠️ part below.
 
-| ID | Law (one line) | Type | Detector (🛠️) |
-|---|---|---|---|
-| EVT-1 | Name `<domain>.<action>` in the past; announces an accomplished fact | constitutional | Scenarios 1–2 / ❌ |
-| EVT-3 | The publisher is the use-case (fire-and-forget, never await); every mutation emits; reads do not emit | constitutional | (see 04-use-cases ARC-CON-1) |
-| EVT-4 | Side effect is a reaction via event; the emitter does not inject the side-effect service | constitutional | Scenario 3 / ❌ |
-| EVT-5 | Reactor named after the intent (`sendXxxEmail`), never after the event (`onXxxCreated`) | constitutional | Scenario 3 / ❌ |
-| EVT-6 | Payload: full entity in the simple case (zero-IO handler); normalized (ids only) at high volume | constitutional | Scenarios 1–2 / ❌ |
-| EVT-7 | Payload always carries `identifier` (idempotencyKey); consumers use `identifier` + `eventType` for dedup | constitutional | Scenarios 1–2 |
-| EVT-8 | Reactor in a different component from the emitter; a use-case never listens to its own event | constitutional | Scenario 3 |
-| EVT-L1 | Reactor decorated with `@Subscriber('event')` and typed with `SubscriberPayload<'event'>` via `PublisherEventMap` augmentation | stack lint | Scenario 3 |
+| ID | Law (one line) | Class | Gate | Detector (🛠️) |
+|---|---|---|---|---|
+| EVT-1 | Name `<domain>.<action>` in the past; announces an accomplished fact | constitutional | `gate:event-name-shape` | Scenarios 1–2 / ❌ |
+| EVT-3 | The publisher is the use-case (fire-and-forget, never await); every mutation emits; reads do not emit | constitutional | `grit:no-await-publish` | (see 04-use-cases ARC-CON-1) |
+| EVT-4 | Side effect is a reaction via event; the emitter does not inject the side-effect service | constitutional | `manual` | Scenario 3 / ❌ |
+| EVT-5 | Reactor named after the intent (`sendXxxEmail`), never after the event (`onXxxCreated`) | constitutional | `manual` | Scenario 3 / ❌ |
+| EVT-6 | Payload: full entity in the simple case (zero-IO handler); normalized (ids only) at high volume | constitutional | `manual` | Scenarios 1–2 / ❌ |
+| EVT-7 | Payload always carries `identifier` (idempotencyKey); consumers use `identifier` + `eventType` for dedup | constitutional | `gate:event-identifier` | Scenarios 1–2 |
+| EVT-8 | Reactor in a different component from the emitter; a use-case never listens to its own event | constitutional | `manual` | Scenario 3 |
 
 ## Governed by the constitution
 
-These laws live in `tury-stack-architecture-pattern` and are not restated here.
+These laws live in `turystack-architecture-pattern` and are not restated here.
 What follows in this section is how the Turystack backend expresses them.
 
-| ID | Law |
-|---|---|
-| `ARC-CON-5` | Event only after the write confirms. |
-| `ARC-CON-6` | Outbox when data and event must be atomic. |
-| `ARC-IDM-2` | The dedup key comes from the fact. |
-| `ARC-IDM-3` | The handler is commutative. |
-| `ARC-IDM-5` | The event carries absolute state. |
-| `ARC-CON-9` | A read replica is derived; the write declares what it invalidates. |
+| ID | Law | How this stack expresses it |
+|---|---|---|
+| `ARC-CON-5` | Event only after the write confirms. | `publisher.publish` after the write commits, never inside the transaction |
+| `ARC-CON-6` | Outbox when data and event must be atomic. | the event row is written in the same transaction and dispatched afterwards |
+| `ARC-IDM-2` | The dedup key comes from the fact. | the key comes from the fact (`orderId` + transition), never generated on arrival |
+| `ARC-IDM-3` | The handler is commutative. | the handler decides from `(state, event)`, so a late message cannot corrupt state |
+| `ARC-IDM-5` | The event carries absolute state. | the payload carries the resulting state, never a delta |
+| `ARC-CON-9` | A read replica is derived; the write declares what it invalidates. | the consumer that maintains a read model invalidates what the write made stale |
 
 `ARC-CON-9` is what the event usually carries on this side: cache, read model,
 search index and materialized counter are all derived from the write that has
@@ -96,8 +101,12 @@ source, never the replica.
 
 **Registration (once, at the root)** — `@turystack/nestjs-publisher` is global; use-cases only inject `PublisherService`:
 
-- **Standalone** → `PublisherModule.register({ adapter: 'event-emitter' })` — in-process delivery, same publishes, subscriber failure logged and isolated.
-- **Monorepo** → `PublisherModule.register((config) => ({ adapter: 'aws', aws: { region, eventBridge: { busName, source } } }))` — `TOPIC` goes to EventBridge, `QUEUE` to SQS.
+`PublisherModule.register((config) => ({ adapter: 'aws', aws: { region, eventBridge: { busName, source } } }))` — `TOPIC` goes to EventBridge, `QUEUE` to SQS.
+
+There is one transport, and it is remote. A reaction that runs inside the
+publishing process shares its deploy, its scaling and its failure mode, which is
+the definition `ARC-TOP-1` uses to say it should have been its own delivery — so
+what consumes an event is always a handler app.
 
 `publish` returns `void` and is **fire-and-forget**: delivery happens in the background, failure is logged by the lib — **never `await`**, never a try/catch around it. Serialization is superjson (Dates, Maps, Sets preserved). `flush()` belongs to the `Serverless.create` wrapper and to the lib's shutdown — **never** to app code.
 
@@ -124,7 +133,6 @@ declare module '@turystack/nestjs-publisher' {
 - **EVT-6** — simple case: spread the entity into `data`; high volume: only ids/keys in the object.
 - **EVT-7** — `data: { identifier: entity.entityId, ...entity }` or `data: { identifier: entity.entityId, ...ids }`.
 - **EVT-8** — reactor in a separate component, never alongside the use-case that published it.
-- **EVT-L1** — `@Subscriber('invite.created') async sendInviteEmail(invite: SubscriberPayload<'invite.created'>)` — the decorator binds the event; the typing comes from `PublisherEventMap`. The optional `{ schema }` validates the payload with Zod before delivery (invalid → logged and discarded).
 
 ### ✅ How to do it
 
@@ -149,12 +157,11 @@ this.publisher.publish({
 })
 ```
 
-**Scenario 3 — reactor in ANOTHER component, named after the intent:** `[EVT-4, EVT-5, EVT-8, EVT-L1]`
+**Scenario 3 — reactor in ANOTHER app, named after the intent:** `[EVT-4, EVT-5, EVT-8]`
 ```typescript
-@Injectable()
-export class InviteNotificationsService {
-  @Subscriber('invite.created')
-  async sendInviteEmail(invite: SubscriberPayload<'invite.created'>) {
+@Handler('EVENTBRIDGE', { schema: inviteCreatedSchema })
+export class SendInviteEmailHandler {
+  async execute(invite: InviteCreated) {
     try {
       this.logger.log('sendInviteEmail', { inviteId: invite.inviteId })
       await this.mailService.send({ to: invite.email, template: 'invite', data: invite })
@@ -165,7 +172,9 @@ export class InviteNotificationsService {
   }
 }
 ```
-> In the monorepo the reactor is an app handler `@Handler('EVENTBRIDGE')` — same intent in the name, same body (see `08-background-handlers`).
+> The handler lives in its own app under `apps/`, and the name says the intent —
+> `SendInviteEmailHandler`, never `OnInviteCreatedHandler` (see
+> `08-background-handlers`).
 
 ### ❌ Never do
 
@@ -175,11 +184,12 @@ constructor(@Inject(NotificationService) private readonly notification: Notifica
 
 // ❌ [EVT-6] in the simple case, sending a thin payload and making the reactor fetch it again
 this.publisher.publish({ destination: 'TOPIC', name: 'invite.created', data: { identifier: invite.inviteId } })
-@Subscriber('invite.created')
-async sendInviteEmail(payload) { const invite = await this.getInviteUseCase.execute(payload.identifier) }
+class SendInviteEmailHandler {
+  async execute(payload) { const invite = await this.getInviteUseCase.execute(payload.identifier) }
+}
 
 // ❌ [EVT-5] named after the event, not after the intent
-@Subscriber('invite.created') async onInviteCreated() {}
+class OnInviteCreatedHandler {}
 
 // ❌ [ARC-CON-5] publishing before success
 this.publisher.publish({ destination: 'TOPIC', name: 'invite.created', data })

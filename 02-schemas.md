@@ -2,13 +2,22 @@
 
 **Concept.** The schema is the **source of truth** for the domain's types. It mirrors the data model, and **every** type derives from it: the entity's fields, the repository's inputs and the controller's DTOs. It is the base of the stack — `Schema → Entity → Repository → UseCase → Controller`.
 
-> **How to read this file.** Two parts, deliberately separated:
-> - **🌐 Generic pattern** — the **portable law**. Holds in any stack (NestJS, PHP, etc.); the text stays true even after swapping frameworks. This is what review enforces as an invariant.
-> - **🛠️ Project-specific** — the **code** that implements each rule in the current stack (TypeScript · NestJS · @turystack · Zod). Swapping stacks rewrites **only** this part; the law above does not change.
->
-> Each rule carries an id `SCH-n` linking the law (generic) to the code (specific). Gates bind by **id**, not by file/line. `SCH-L*` rules are **stack lints**: they exist only because of the current language's ergonomics (they invert in another stack), but they stay id-registered and enforced in this project.
+> **How to read this file.** 🌐 Generic pattern is the portable law; 🛠️
+> Project-specific is that same law expressed as code in TypeScript · NestJS ·
+> @turystack · Zod. The split, `XXX-n` versus `XXX-Ln`, and why an `ARC-…` law
+> is cited and never restated: `turystack-backend-pattern` › *How a section is
+> written*.
 
 ---
+
+**Rules defined here:** `SCH-1` · `SCH-2` · `SCH-3` · `SCH-4` · `SCH-5` ·
+`SCH-8` · `SCH-9` · `SCH-10` · `SCH-L1` · `SCH-L2` · `SCH-L3` · `SCH-L4` ·
+`SCH-L5` — the law is the *Invariants* table below; every ❌ item cites the id
+it violates.
+
+**Retired ids:** `SCH-6` · `SCH-7` — retired, not renumbered. A review or
+commit citing one points at a rule that no longer exists; the number is never
+reused.
 
 ## 🌐 Generic pattern (portable — stack-independent)
 
@@ -55,34 +64,46 @@ An FK (`organizationId`) always carries the `organization: OrganizationIdentity`
 
 Inside the main schema, always in this order: **PK → FKs (+ the join's Identity field alongside) → important fields → less important fields → booleans → status → timestamps + audit**. The order mirrors the entity and the data model. **[SCH-8]**
 
+**SCH-9 — an input field validates what the user can actually type.**
+
+A field that arrives from a human — a request body or a form — is validated against the shape **and** against the ways that shape is wrong in practice: whitespace-only text, a blank numeric field, an amount with too many decimals, a date the calendar does not have, a document whose check digits do not close. A type check that accepts `'   '` as a name is not validation; it is a cast.
+
+The rules are declared once and shared by every surface that accepts the field, so the API and the form agree on what is valid. **[SCH-9]**
+
+**SCH-10 — a validation failure carries a stable code, never a message to match on.**
+
+Every failure exposes a machine-readable code that does not change with the validation library's version or locale. Callers branch on the code; the message is resolved from it. Matching on the text of an error is a contract nobody declared and everybody breaks. **[SCH-10]**
+
 ### Invariants (the law the gates enforce)
 
-> Bind by **id**. `constitutional` = portable invariant (holds in any stack). `stack lint` = exists only because of the current language's ergonomics and inverts in another stack — still id-registered and enforced here. The **detector** (how the gate catches the violation) is project-specific and lives in the 🛠️ part below.
 
-| ID | Law (one line) | Type | Detector (🛠️) |
-|---|---|---|---|
-| SCH-1 | Schema is the source of truth; downstream types derived by inference/projection, never hand-written | constitutional | Scenarios 1–2 / ❌ |
-| SCH-2 | Schemas and derived types in separate files, each with an exclusive responsibility; never mixed | constitutional | Scenarios 1–2 / ❌ |
-| SCH-3 | Schema covers every field of the model (PK, FKs, business, timestamps, audit) | constitutional | Scenario 1 / ❌ |
-| SCH-4 | Every field carries inline metadata (description + example); terse descriptions | constitutional | Scenarios 1–2 / ❌ |
-| SCH-5 | Enum/complex type extracted as a named schema before the main schema; never inline | constitutional | Scenarios 1–2 / ❌ |
-| SCH-8 | Field ordering: PK → FKs (+ Identity) → important → booleans → status → timestamps + audit | constitutional | Scenario 1 |
-| SCH-L1 | Import from `zod`, never from `zod/v4` | stack lint | ❌ |
-| SCH-L2 | Dates use `z.date()` (never `z.string()`); optional/nullable uses `.nullish()` | stack lint | Scenario 1 / ❌ |
-| SCH-L3 | 100% native Zod, no wrappers; `z.infer` to derive types (never hand-write the shape) | stack lint | Scenarios 1–2 / ❌ |
-| SCH-L4 | Metadata via `.meta({ description, example })` chained directly on the field | stack lint | Scenarios 1–2 / ❌ |
+| ID | Law (one line) | Class | Gate | Detector (🛠️) |
+|---|---|---|---|---|
+| SCH-1 | Schema is the source of truth; downstream types derived by inference/projection, never hand-written | constitutional | `manual` | Scenarios 1–2 / ❌ |
+| SCH-2 | Schemas and derived types in separate files, each with an exclusive responsibility; never mixed | constitutional | `gate:file-roles` | Scenarios 1–2 / ❌ |
+| SCH-3 | Schema covers every field of the model (PK, FKs, business, timestamps, audit) | constitutional | `manual` | Scenario 1 / ❌ |
+| SCH-4 | Every field carries inline metadata (description + example); terse descriptions | constitutional | `gate:schema-metadata` | Scenarios 1–2 / ❌ |
+| SCH-5 | Enum/complex type extracted as a named schema before the main schema; never inline | constitutional | `manual` | Scenarios 1–2 / ❌ |
+| SCH-8 | Field ordering: PK → FKs (+ Identity) → important → booleans → status → timestamps + audit | constitutional | `manual` | Scenario 1 |
+| SCH-9 | An input field validates the ways its shape is wrong in practice, not only the shape | constitutional | `manual` | Scenario 3 / ❌ |
+| SCH-10 | A failure carries a stable code; callers branch on the code, never on the message | constitutional | `manual` | Scenario 3 / ❌ |
+| SCH-L1 | Import from `zod`, never from `zod/v4` | stack lint | `biome:noRestrictedImports` | ❌ |
+| SCH-L2 | Dates use `z.date()` (never `z.string()`); optional/nullable uses `.nullish()` | stack lint | `grit:no-string-date` | Scenario 1 / ❌ |
+| SCH-L3 | Model schema is native Zod, no **local** wrappers; `z.infer` to derive types (never hand-write the shape) | stack lint | `grit:no-hand-written-model-type` | Scenarios 1–2 / ❌ |
+| SCH-L4 | Metadata via `.meta({ description, example })` chained directly on the field | stack lint | `gate:schema-metadata` | Scenarios 1–2 / ❌ |
+| SCH-L5 | Input fields come from `@turystack/fields`; hand-rolled `.trim().min(1)`, `z.coerce.number()` on a body and hand-written document checks banned | stack lint | `grit:no-hand-rolled-field` | Scenario 3 / ❌ |
 
 ## Governed by the constitution
 
-These laws live in `tury-stack-architecture-pattern` and are not restated here.
+These laws live in `turystack-architecture-pattern` and are not restated here.
 What follows in this section is how the Turystack backend expresses them.
 
-| ID | Law |
-|---|---|
-| `ARC-CTR-1` | Contract declared once, types derive. |
-| `ARC-CTR-2` | Relationship imported from the owning module. |
-| `ARC-CTR-3` | Module exposes an Identity to be referenced. |
-| `ARC-CTR-7` | Contract data stays derived; never copied into local state. |
+| ID | Law | How this stack expresses it |
+|---|---|---|
+| `ARC-CTR-1` | Contract declared once, types derive. | one Zod schema per concept; DTO and response derive with `.pick`/`.omit` |
+| `ARC-CTR-2` | Relationship imported from the owning module. | import the other domain's schema; never redeclare its fields |
+| `ARC-CTR-3` | Module exposes an Identity to be referenced. | the domain exports its Identity type for others to reference |
+| `ARC-CTR-7` | Contract data stays derived; never copied into local state. | types inferred from the schema, never a parallel hand-written interface |
 
 `ARC-CTR-1` kills the second **shape** — the hand-rewritten type. `ARC-CTR-7`
 kills the second **copy** — the instance field that stores the result of a read
@@ -110,8 +131,11 @@ the second.
 - **SCH-8** — the field order in `z.object(...)` mirrors the convention: PK → FKs + Identity → important → booleans → status → timestamps.
 - **SCH-L1** — the project uses Zod v4; the canonical import is `import { z } from 'zod'` — never `import { z } from 'zod/v4'`.
 - **SCH-L2** — `z.date()` for `createdAt`/`updatedAt`/`deletedAt`; `.nullish()` for optional/nullable fields.
-- **SCH-L3** — use `z.object`, `z.string`, `z.uuid`, `z.boolean`, `z.array`, `z.enum` directly; no custom wrappers over Zod.
+- **SCH-L3** — in the **model** schema use `z.object`, `z.string`, `z.uuid`, `z.boolean`, `z.array`, `z.enum` directly; never a wrapper invented in the domain file. A stack package is not a wrapper: `@turystack/fields` on input fields (`SCH-L5`) and `@turystack/query-dsl` on query parameters are the two exceptions, and both are mandatory where they apply.
 - **SCH-L4** — `.meta(...)` chained directly on the field's schema (never in a comment nor in separate docs).
+- **SCH-9** — the input schema (`{domain}.schemas.ts` next to the controller, `CTL-L2`) builds its user-facing fields with `@turystack/fields`: `RequiredStringSchema`, `EmailSchema`, `MoneySchema`, `DateOnlySchema`, `FileSchema`, `UrlSchema`, and `@turystack/fields/br` for `CpfSchema`/`CnpjSchema`/`PhoneSchema`. The model schema (Scenario 1) keeps native Zod — it mirrors the table, not a keyboard.
+- **SCH-10** — every failure carries `params.code` from `FieldIssueCode`; `formatErrors(error, resolve)` flattens a `ZodError` into `Record<path, { code, message, params }>`. A missing value always resolves to `required`, never to `invalid_type`.
+- **SCH-L5** — `import { RequiredStringSchema } from '@turystack/fields'`; never `z.string().trim().min(1)`, `z.coerce.number()` on a body field, `Math.round(value * 100)` for money, `z.coerce.date()` for a calendar date, or a hand-written CPF/CNPJ regex. Every one of those has a schema that already covers the case the hand-rolled version misses.
 
 ### ✅ How to do it
 
@@ -167,6 +191,61 @@ export type ProductStatus = z.infer<typeof productStatusSchema>
 export type ProductIdentity = z.infer<typeof productIdentitySchema>
 ```
 
+**Scenario 3 — input schema: the model schema says what a product *is*, this says what a human is allowed to type:** `[SCH-9, SCH-10, SCH-L5, SCH-4, CTL-L2]`
+
+```typescript
+import {
+  DateOnlySchema,
+  MoneySchema,
+  OptionalStringSchema,
+  RequiredArraySchema,
+  RequiredStringSchema,
+  UrlSchema,
+} from '@turystack/fields'
+import { CnpjSchema } from '@turystack/fields/br'
+import { createRequestSchema } from '@turystack/nestjs-server'
+import { z } from 'zod'
+
+import { productSchema, productStatusSchema } from '@/domains/product/product.schema'
+
+export const createProductRequest = createRequestSchema({
+  body: z.object({
+    // SCH-L5: '   ' fails as `required`, not as `too_small`; the value is
+    // sanitized before the bounds are measured
+    name: RequiredStringSchema({ min: 3, max: 120 }),
+    description: OptionalStringSchema({ max: 2000 }),
+    // SCH-L5: minor units assembled from the digit string — no amount is ever
+    // rounded through a float on its way in
+    priceCents: MoneySchema({ minCents: 1 }),
+    // SCH-L5: a calendar date stays a calendar date; z.coerce.date() would make
+    // it an instant and move the day in a negative-offset zone
+    availableOn: DateOnlySchema({ notPast: true }),
+    supplierDocument: CnpjSchema(),
+    manualUrl: UrlSchema({ blockPrivateHosts: true, requireHttps: true }),
+    categoryIds: RequiredArraySchema(productSchema.shape.categoryId),
+    status: productStatusSchema,
+  }),
+})
+```
+
+**Scenario 4 — the failure crosses the wire as a code:** `[SCH-10]`
+
+```typescript
+import { formatErrors } from '@turystack/fields'
+import type { FieldIssueCode } from '@turystack/fields'
+
+// SCH-10: exhaustive by construction — a new code that has no message is a
+// compile error here, not a blank string in production
+const messages: Record<FieldIssueCode, string> = { /* ... */ }
+
+const result = createProductRequest.body.safeParse(input)
+
+if (!result.success) {
+  const errors = formatErrors(result.error, (issue) => messages[issue.code])
+  // { name: { code: 'required', message: 'Campo obrigatório', params: {}, path: 'name' } }
+}
+```
+
 ### ❌ Never do
 
 ```typescript
@@ -197,6 +276,23 @@ export type Product = { productId: string; name: string }
 // ❌ [SCH-L3] custom wrapper instead of native Zod
 const myString = (desc: string) => z.string().meta({ description: desc })
 field: myString('Product name')  // use z.string().meta({ description: 'Product name' })
+
+// ❌ [SCH-L5] hand-rolled input validation — every line here has a case it misses
+name: z.string().min(1).trim()          // '   ' passes — .trim() runs after the bound
+name: z.string().trim().min(1)          // right order, wrong code: reports `too_small`,
+                                        // and a zero-width space passes either way
+                                        // use RequiredStringSchema()
+priceCents: z.coerce.number()           // '' becomes 0 — a blank field is not a zero
+                                        // use MoneySchema()
+availableOn: z.coerce.date()            // '2026-01-01' is 31 December in São Paulo
+                                        // use DateOnlySchema()
+document: z.string().regex(/^\d{11}$/)  // 111.111.111-11 matches and is invalid
+                                        // use CpfSchema()
+manualUrl: z.url()                      // accepts javascript: and http://169.254.169.254
+                                        // use UrlSchema({ blockPrivateHosts: true })
+
+// ❌ [SCH-10] branching on the message text instead of the code
+if (issue.message.includes('Too small')) { /* breaks on the next zod release */ }
 
 // ❌ [SCH-L4] metadata in a comment or a separate object instead of .meta() chained on the field
 /** @description Product name */

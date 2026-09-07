@@ -2,13 +2,21 @@
 
 **Concept.** Rich domain model: state **and** behavior (rules, transitions, invariants), not an anemic bag of data. The entity is the **owner of the business invariants** — it is what the use-case calls at **step 3 of the ladder** (the guards that throw 409). Guard before mutating; invalid state is unreachable. The entity **never** knows about infra (repository, adapter, ORM, HTTP).
 
-> **How to read this file.** Two parts, deliberately separated:
-> - **🌐 Generic pattern** — the **portable law**. Holds in any stack (NestJS, PHP, etc.); the text stays true even after swapping frameworks. This is what review enforces as an invariant.
-> - **🛠️ Project-specific** — the **code** that implements each rule in the current stack (TypeScript · NestJS · @turystack · Drizzle · Zod). Swapping stacks rewrites **only** this part; the law above does not change.
->
-> Each rule carries an id `ENT-n` linking the law (generic) to the code (specific). Gates bind by **id**, not by file/line. `ENT-L*` rules are **stack lints**: they exist only because of the current language's ergonomics (they invert in another stack), but they stay id-registered and enforced in this project.
+> **How to read this file.** 🌐 Generic pattern is the portable law; 🛠️
+> Project-specific is that same law expressed as code in TypeScript · NestJS ·
+> @turystack · Drizzle · Zod. The split, `XXX-n` versus `XXX-Ln`, and why an
+> `ARC-…` law is cited and never restated: `turystack-backend-pattern` › *How
+> a section is written*.
 
 ---
+
+**Rules defined here:** `ENT-1` · `ENT-2` · `ENT-3` · `ENT-5` · `ENT-7` ·
+`ENT-8` · `ENT-L1` · `ENT-L2` · `ENT-L3` — the law is the *Invariants* table
+below; every ❌ item cites the id it violates.
+
+**Retired ids:** `ENT-4` · `ENT-6` — retired, not renumbered. A review or
+commit citing one points at a rule that no longer exists; the number is never
+reused.
 
 ## 🌐 Generic pattern (portable — stack-independent)
 
@@ -40,29 +48,28 @@
 
 ### Invariants (the law the gates enforce)
 
-> Bind by **id**. `constitutional` = portable invariant (holds in any stack). `stack lint` = exists only because of the current language's ergonomics and inverts in another stack — still id-registered and enforced here. The **detector** (how the gate catches the violation) is project-specific and lives in the 🛠️ part below.
 
-| ID | Law (one line) | Type | Detector (🛠️) |
-|---|---|---|---|
-| ENT-1 | Entity decides the rule; use-case delegates via guard; never a 409 inline in the use-case | constitutional | Scenario 1 / ❌ |
-| ENT-2 | Guard covers one invariant; no IO (no repo/adapter/external I/O) | constitutional | Scenario 1 / ❌ |
-| ENT-3 | Mutation calls guard(s) before mutating a field | constitutional | Scenario 1 / ❌ |
-| ENT-5 | Ordering: PK → FK+Identity → important → less important → booleans → status → timestamps+audit | constitutional | Scenario 2 / ❌ |
-| ENT-7 | Every `if` with a `{}` block; no `if` without braces; no ternary hiding a throw | constitutional | Scenario 1 / ❌ |
-| ENT-8 | Readers derive state, with no side effects and no IO | constitutional | Scenario 1 |
-| ENT-L1 | Class decorated with `@Entity()` | stack lint | Scenarios 1–2 |
-| ENT-L2 | Hydration in the constructor via `Object.assign(this, data)` | stack lint | Scenarios 1–2 / ❌ |
-| ENT-L3 | Fields typed by indexed access on the schema (`field!: Type['field']`); never by hand | stack lint | Scenarios 1–2 / ❌ |
+| ID | Law (one line) | Class | Gate | Detector (🛠️) |
+|---|---|---|---|---|
+| ENT-1 | Entity decides the rule; use-case delegates via guard; never a 409 inline in the use-case | constitutional | `manual` | Scenario 1 / ❌ |
+| ENT-2 | Guard covers one invariant; no IO (no repo/adapter/external I/O) | constitutional | `grit:no-io-in-entity` | Scenario 1 / ❌ |
+| ENT-3 | Mutation calls guard(s) before mutating a field | constitutional | `manual` | Scenario 1 / ❌ |
+| ENT-5 | Ordering: PK → FK+Identity → important → less important → booleans → status → timestamps+audit | constitutional | `manual` | Scenario 2 / ❌ |
+| ENT-7 | Every `if` with a `{}` block; no `if` without braces; no ternary hiding a throw | constitutional | `biome:useBlockStatements` | Scenario 1 / ❌ |
+| ENT-8 | Readers derive state, with no side effects and no IO | constitutional | `grit:no-io-in-entity` | Scenario 1 |
+| ENT-L1 | Class decorated with `@Entity()` | stack lint | `gate:entity-decorator` | Scenarios 1–2 |
+| ENT-L2 | Hydration in the constructor via `Object.assign(this, data)` | stack lint | `manual` | Scenarios 1–2 / ❌ |
+| ENT-L3 | Fields typed by indexed access on the schema (`field!: Type['field']`); never by hand | stack lint | `manual` | Scenarios 1–2 / ❌ |
 
 ## Governed by the constitution
 
-These laws live in `tury-stack-architecture-pattern` and are not restated here.
+These laws live in `turystack-architecture-pattern` and are not restated here.
 What follows in this section is how the Turystack backend expresses them.
 
-| ID | Law |
-|---|---|
-| `ARC-LAY-2` | Domain does not import infra. |
-| `ARC-CTR-3` | FK referenced by Identity. |
+| ID | Law | How this stack expresses it |
+|---|---|---|
+| `ARC-LAY-2` | Domain does not import infra. | the entity imports no repository, no Nest decorator, no transport |
+| `ARC-CTR-3` | FK referenced by Identity. | a related record is held as its Identity, never as the whole foreign entity |
 
 
 ---

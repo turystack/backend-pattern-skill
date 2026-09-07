@@ -19,11 +19,14 @@ jobs:
         with:
           node-version: '24'
 
-      # This package ships content, not code: no dependencies, no lockfile, so
-      # there is nothing to install or compile. What can still break is the
-      # manifest and the `files` glob, and that is exactly what is checked.
-      - name: Validate manifest
-        run: node -e "JSON.parse(require('fs').readFileSync('package.json','utf8'))"
-
-      - name: Verify publishable contents
-        run: npm pack --dry-run
+      # A skill is markdown, and markdown fails quietly: a separator row one
+      # column short drops cells when it renders, so a law disappears from the
+      # page while staying in the file. That is the worst outcome for a document
+      # whose only job is to be read, and nothing here used to catch it.
+      #
+      # This checks what a skill can prove on its own — its frontmatter, its
+      # tables, its ids, and that every law names a gate. Cross-skill citations
+      # and gate coverage need every skill at once and live in the monorepo's
+      # `scripts/validate-skills.mjs`.
+      - name: The skill is well formed
+        run: npx --yes @turystack/proof-mode-gates skill .

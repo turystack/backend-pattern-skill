@@ -4,31 +4,59 @@
 existence, invariants, persistence, integrations and events without knowing
 about HTTP, queues or the runtime.
 
-## Invariants
+> **How to read this file.** 🌐 Generic pattern is the portable law; 🛠️
+> Project-specific is that same law expressed as code in TypeScript · NestJS ·
+> @turystack. The split, `XXX-n` versus `XXX-Ln`, and why an `ARC-…` law is
+> cited and never restated: `turystack-backend-pattern` › *How a section is
+> written*.
 
-| ID | Law |
-|---|---|
-| UC-1 | One operation = one class = one public `execute(input)` method; queries are use-cases too. |
-| UC-2 | The input shape is validated at the boundary; the use-case does not repeat Zod nor validate format. |
-| UC-3 | Existence/ownership are checked before the rule; absence produces the domain's typed error. |
-| UC-4 | A business rule is protected by an entity guard/mutation, not by a duplicated `if` in the use-case. |
-| UC-6 | The return is an entity, a collection/page of entities or `void`; never a database row or an HTTP DTO. |
+---
+
+**Rules defined here:** `UC-1` · `UC-2` · `UC-3` · `UC-4` · `UC-6` — the law
+is the *Invariants* table below; every ❌ item cites the id it violates.
+
+**Retired ids:** `UC-5` — retired, not renumbered. A review or commit citing
+one points at a rule that no longer exists; the number is never reused.
+
+## 🌐 Generic pattern (portable — stack-independent)
+
+### Invariants (the law the gates enforce)
+
+| ID | Law (one line) | Class | Gate | Detector (🛠️) |
+|---|---|---|---|---|
+| UC-1 | One operation = one class = one public `execute(input)`; a query is a use-case too | constitutional | `gate:use-case-shape` | Example / ❌ |
+| UC-2 | Input shape is validated at the boundary; the use-case never revalidates format | constitutional | `manual` | Validation ladder / ❌ |
+| UC-3 | Existence and ownership are proven before the rule; absence raises the domain's typed error | constitutional | `manual` | Validation ladder / ❌ |
+| UC-4 | A business rule is protected by an entity guard/mutation, never by an `if` copied into the use-case | constitutional | `gate:no-rule-in-use-case` | Example / ❌ |
+| UC-6 | The return is an entity, a collection/page of entities or nothing — never a database row or a transport DTO | constitutional | `manual` | Example / ❌ |
+
+Ids are stable across versions; a gap is a law that moved to the constitution.
+
+**Why UC-1 and not a service with many methods.** A class per operation is what
+makes the dependency list of that operation visible. An `OrderService` with
+eight methods carries the union of eight dependency sets, so a handler that runs
+one of them is forced to register all eight (`ARC-TOP-3`), and no reader can
+tell which of the eight actually uses the publisher.
+
+**Why UC-6 refuses to return a row.** A database row is the persistence format;
+handing it to a caller makes the storage schema part of the operation's
+contract, and every consumer becomes a reason not to change a column.
 
 ## Governed by the constitution
 
-These laws live in `tury-stack-architecture-pattern` and are not restated here.
-What follows in this section is how the Turystack backend expresses them.
+These laws live in `turystack-architecture-pattern` and are not restated here.
+What follows is how the Turystack backend expresses them.
 
-| ID | Law |
-|---|---|
-| `ARC-LAY-4` | Cross-domain through the public operation. |
-| `ARC-CON-1` | Every write declares its strategy. |
-| `ARC-CON-5` | Event only after the write is confirmed. |
-| `ARC-OBS-4` | Error logged once at the boundary. |
-| `ARC-TOP-3` | The app registers only the closure it consumes. |
+| ID | Law | How this stack expresses it |
+|---|---|---|
+| `ARC-LAY-4` | Cross-module access only through the public operation. | inject another domain's use-case, never its repository |
+| `ARC-CON-1` | Every write declares its strategy. | `@Transactional()`, explicit compensation, or persist → publish |
+| `ARC-CON-3` | A transaction is never held open across an external call. | external I/O runs outside `@Transactional()` |
+| `ARC-CON-5` | An event is emitted only after the write commits. | `publisher.publish` after the persistence call returns |
+| `ARC-OBS-4` | An error is logged once, at the highest boundary. | the use-case rethrows; the filter logs |
+| `ARC-TOP-3` | An app registers only the closure it consumes. | the handler registers this use-case, not the domain's whole provider set |
 
-
-## Validation ladder
+### Validation ladder
 
 Inside `execute`, preserve the order:
 
@@ -43,19 +71,7 @@ Structural validation (required, enum, format, length) belongs to the
 controller/handler schema. The HTTP category is a server-side translation; the
 use-case throws typed application errors.
 
-## Allowed dependencies
-
-- The `DatabaseService` typed repository for trivial persistence.
-- Its own repository when it adds policy/composition.
-- Another domain's public use-case.
-- A service offered directly by a Turystack lib.
-- A local adapter for an integration not covered by the libs.
-- A publisher for events after success.
-
-Do not inject the request, the response, a transport decorator or another
-domain's repository.
-
-## Consistency choice
+### Consistency choice
 
 ```text
 one write
@@ -83,9 +99,29 @@ When using compensation:
 4. persist the external identifier/result;
 5. on failure, compensate and rethrow.
 
-Do not hold a database transaction open during external I/O.
+Do not hold a database transaction open during external I/O (`ARC-CON-3`).
 
-## Example
+---
+
+## 🛠️ Project-specific (TypeScript · NestJS · @turystack)
+
+### Allowed dependencies
+
+- The `DatabaseService` typed repository for trivial persistence.
+- Its own repository when it adds policy/composition.
+- Another domain's public use-case.
+- A service offered directly by a Turystack lib.
+- A local adapter for an integration not covered by the libs.
+- A publisher for events after success.
+
+Do not inject the request, the response, a transport decorator or another
+domain's repository.
+
+A compensating sequence that outgrows the use-case has an owner:
+`@turystack/saga`. Reach for it before hand-rolling a coordinator
+(`ARC-LAY-8`).
+
+### Example
 
 ```typescript
 export type CancelOrderInput = {
@@ -128,20 +164,20 @@ export class CancelOrderUseCase {
   a duplicate `CreateOrderOutput`.
 - `publish` and `@Transactional` follow the API documented by their respective libs.
 
-## Registration per consumer
+### Registration per consumer
 
 The API/handler root module registers the use-case and its transitive dependencies.
 Do not create `OrderModule` just to re-export all of the domain's providers. A
 small handler must not carry operations it never runs.
 
-## Never do
+### ❌ Never do
 
-- Create an `OrderService` with several business methods.
-- Validate email, enum or required again inside `execute`.
-- Implement a guard with an `if` over state instead of calling the entity.
-- Access another domain's repository.
-- Return an invented partial object or an ORM row.
-- Call a provider before persisting without a consistency strategy.
-- Catch an error only to `logger.error` + `throw`; the boundary already logs the
-  failure.
-- Swallow an error or return `null` after a failure.
+- `[UC-1]` Create an `OrderService` with several business methods.
+- `[UC-2]` Validate email, enum or required again inside `execute`.
+- `[UC-4]` Implement a guard with an `if` over state instead of calling the entity.
+- `[ARC-LAY-4]` Access another domain's repository.
+- `[UC-6]` Return an invented partial object or an ORM row.
+- `[ARC-CON-1]` Call a provider before persisting without a consistency strategy.
+- `[ARC-CON-3]` Keep `@Transactional()` open around an external call.
+- `[ARC-OBS-4]` Catch an error only to `logger.error` + `throw`; the boundary already logs the failure.
+- `[ARC-ERR-7]` Swallow an error or return `null` after a failure.
